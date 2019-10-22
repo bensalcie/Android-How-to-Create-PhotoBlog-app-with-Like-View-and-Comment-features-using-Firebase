@@ -1,0 +1,1527 @@
+---
+
+Updated!! ,How to create an Android Photo Blog App with like ,view and comment features using Firebase.
+Hi friends, today i will show you how to create a full photo blog android app that will help you to share favourite photos with your friends. This tutorial will cover the following.
+Login and Registration.
+Creating the home page.
+Creating the upload page.
+Creating a custom layout for our single post.
+Importing the required Libraries.
+Creating a custom adapter for our recyclerview.
+Finishing and styling.
+
+Our output will look like this:
+
+
+Above are the pictures of the final app we should have after this tutorial.
+
+---
+
+Getting started:
+Create a new project by selecting an empty activity. Click next, then finish.
+We have to design a new drawable resource file for our input fields, so go to drawables right click then select new drawable resource file. This brings you a new xml file with <select></select> tags. Call it input_outline.xml :
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <corners android:radius="16dp" />
+    <solid android:color="#ffffff"/>
+</shape
+You can customize this to fit your needs for the shape of the buttons as well and save it as button_outline.xml.
+Next add some permisions for your app by opening the manifest file:
+<uses-permission android:name="android.permission.INTERNET" />
+
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+Next to Tool>Firebase>Authentication>Email and password authentication>Connect>Add authentication to your app. Make sure your project syncs successfully without any errors. Now go to your Gradle scripts (Module), lets add some dependancies that we will use in our project.
+implementation 'com.google.firebase:firebase-auth:11.8.0'
+implementation 'com.google.firebase:firebase-storage:11.8.0'
+implementation 'com.google.firebase:firebase-database:11.8.0'
+implementation 'com.squareup.picasso:picasso:2.71828'
+implementation 'de.hdodenhof:circleimageview:3.0.1'
+implementation 'com.firebaseui:firebase-ui-database:3.2.2'
+Also make sure that your project syncs successfully after the dependencies. Now we are ready to tackle our project.Create a new activity, an empty activity by going to your package>new>activity>emptyactivity. Lets call it LoginActivity. Edit your xml file to look as this:
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:background="#6C6C6C"
+    android:transitionName="etTransition"
+    android:layout_gravity="center"
+    android:gravity="center"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:layout_gravity="center"
+        android:src="@drawable/tags_tu"
+        android:layout_width="wrap_content"
+        android:layout_height="250dp"/>
+    <EditText
+        android:inputType="textEmailAddress"
+        android:hint="Email..."
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:layout_marginBottom="10dp"
+
+        android:id="@+id/etEmail"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <EditText
+        android:inputType="textPassword"
+        android:hint="Password..."
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/etPassword"
+
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <Button
+        android:layout_marginTop="30dp"
+        android:layout_width="match_parent"
+        android:text="SIGN IN"
+
+        android:textColor="#1497D4"
+        android:layout_marginLeft="15dp"
+        android:layout_marginRight="15dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:id="@+id/btnLogin"
+        android:layout_marginBottom="10dp"
+
+        android:layout_height="wrap_content"/>
+    <Button
+        android:layout_width="match_parent"
+        android:text="Create Account"
+        android:layout_marginLeft="15dp"
+        android:layout_marginRight="15dp"
+        android:background="@drawable/button_outline"
+        android:padding="10dp"
+        android:onClick="registerme"
+        android:textColor="@color/colorWhite"
+        android:id="@+id/btnSignUp"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>
+Your java file will look like this:
+package org.likesyou.bensalcie.photohub;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.annotation.SuppressLint;
+import android.app.ActivityOptions;
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Pair;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+public class MainActivity extends AppCompatActivity {
+    private EditText etEmail,etPassword;
+    private Button btnLogin;
+    private FirebaseAuth mAuth;
+    private ProgressDialog pd;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        getSupportActionBar().hide();
+        etEmail=findViewById(R.id.etEmail);
+        etPassword=findViewById(R.id.etPassword);
+        btnLogin=findViewById(R.id.btnLogin);
+        mAuth=FirebaseAuth.getInstance();
+        pd=new ProgressDialog(this);
+        pd.setTitle("Just a moment");
+        pd.setMessage("Logging in...");
+
+
+        btnLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String email=etEmail.getText().toString().trim();
+                String password=etPassword.getText().toString().trim();
+                if (!email.contains("@") || TextUtils.isEmpty(email) || email.length()<7)
+                {
+                    givemesometoast(etEmail,"Your email is invalid...");
+                }else if (!TextUtils.isEmpty(password) && password.length()>=7)
+                {
+                    //Toast.makeText(MainActivity.this, "Correct details", Toast.LENGTH_SHORT).show();
+
+                    pd.show();
+                    mAuth.signInWithEmailAndPassword(email,password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+                        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+                        @Override
+                        public void onComplete(@NonNull Task<AuthResult> task) {
+
+                            if (task.isSuccessful())
+                            {
+                                pd.dismiss();
+                                Pair[] pairs=new Pair[1];
+                                pairs[0]=new Pair<View,String>(etEmail,"etTransition");
+
+                                ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(MainActivity.this,pairs);
+                                startActivity(new Intent(MainActivity.this,HomeActivity.class),options.toBundle());
+                                finish();
+
+                            }else {
+                                pd.dismiss();
+                                Toast.makeText(MainActivity.this, "Error: "+task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                    //Do your stuffs here.
+                    //givemesometoast("Your credentials input are correct...");
+
+                }else{
+                    pd.dismiss();
+                    givemesometoast(etPassword,"Invalid password minimum of 7 characters ...");
+                }
+            }
+        });
+
+
+    }
+
+    private void givemesometoast(EditText etText,String s) {
+        //Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
+        etText.setError(s);
+        etText.requestFocus();
+
+    }
+
+    public void registerme(View view) {
+        startActivity(new Intent(MainActivity.this,RegisterActivity.class));
+        finish();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        FirebaseUser currentUser=mAuth.getCurrentUser();
+        if (currentUser==null)
+        {
+
+        }else{
+        startActivity(new Intent(MainActivity.this,HomeActivity.class));
+            finish();
+
+        }
+    }
+}
+The above just takes the text from the edittext,validates it then checks if this user exists from the database, for this case in our firebase database.
+Create a new activity too Call it RegisterActivity, this will help us to create ones accout in the firebase database. This is how your xml will look like.
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:transitionName="etTransition"
+    android:background="@color/colorPrimary"
+    android:layout_height="match_parent"
+    tools:context=".RegisterActivity">
+
+    <ImageView
+        android:layout_gravity="center"
+        android:src="@drawable/tags_tu"
+
+        android:layout_width="wrap_content"
+        android:layout_height="250dp"/>
+
+    <EditText
+        android:inputType="textEmailAddress"
+        android:hint="Email..."
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:layout_marginBottom="10dp"
+        android:id="@+id/etEmail"
+
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <EditText
+        android:inputType="textPassword"
+        android:hint="Password..."
+
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <EditText
+        android:inputType="textPassword"
+        android:hint="Retype Password..."
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/etPassword1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <Button
+        android:layout_width="match_parent"
+        android:text="Create Account"
+        android:layout_marginLeft="15dp"
+        android:layout_marginRight="15dp"
+        android:background="@drawable/button_outline"
+        android:padding="10dp"
+
+        android:textColor="@color/colorWhite"
+        android:id="@+id/btnSignUp"
+        android:layout_height="wrap_content"/>
+    <Button
+        android:layout_marginTop="30dp"
+        android:layout_width="match_parent"
+        android:text="Login Instead"
+        android:textColor="#1497D4"
+
+        android:layout_marginLeft="15dp"
+        android:layout_marginRight="15dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:onClick="loginme"
+        android:id="@+id/btnLogin"
+        android:layout_marginBottom="10dp"
+
+        android:layout_height="wrap_content"/>
+
+
+</LinearLayout>
+The java file should look like this:
+package org.likesyou.bensalcie.photohub;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.ActivityOptions;
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Pair;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+
+public class RegisterActivity extends AppCompatActivity {
+
+    private EditText etEmail,etPassword,etPassword1;
+    private Button btnRegister;
+    private ProgressDialog pd;
+    private FirebaseAuth mAuth;
+    private LinearLayout parentLayout;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_register);
+        getSupportActionBar().hide();
+
+        mAuth=FirebaseAuth.getInstance();
+        pd=new ProgressDialog(this);
+        pd.setTitle("Just a moment");
+        pd.setMessage("Creating account...");
+        etEmail=findViewById(R.id.etEmail);
+        etPassword=findViewById(R.id.etPassword);
+        etPassword1=findViewById(R.id.etPassword1);
+        btnRegister=findViewById(R.id.btnSignUp);
+        parentLayout=findViewById(R.id.parentLayout);
+        btnRegister.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String email=etEmail.getText().toString().trim();
+                String password=etPassword.getText().toString().trim();
+                String password1=etPassword1.getText().toString().trim();
+
+                if (!email.contains("@") && TextUtils.isEmpty(email) && email.length()<7)
+                {
+
+                    givemesometoast(etEmail,"Invalid email.. ");
+                }else if (!TextUtils.isEmpty(password) && password.length()>7 || !TextUtils.isEmpty(password1) && password1.length()>7 )
+                {
+                    //Do your stuffs here.
+                    if (password.equals(password1) && password.length()>=7) {
+
+                        pd.show();
+                        mAuth.createUserWithEmailAndPassword(email,password1).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+                            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+                            @Override
+                            public void onComplete(@NonNull Task<AuthResult> task) {
+                                if (task.isSuccessful())
+                                {
+                                    pd.dismiss();
+                                    finish();
+
+                                    Pair[] pairs=new Pair[1];
+                                    pairs[0]=new Pair<View,String>(etEmail,"etTransition");
+
+                                    ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(RegisterActivity.this,pairs);
+
+                                    startActivity(new Intent(RegisterActivity.this,ProfileActivity.class),options.toBundle());
+
+                                }else {
+                                    pd.dismiss();
+                                    Toast.makeText(RegisterActivity.this, "Error: "+task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                                }
+
+                            }
+                        });
+                      //  Toast.makeText(RegisterActivity.this, "Correct credentials", Toast.LENGTH_SHORT).show();
+
+                        //givemesometoast("Your credentials input are correct...");
+                    }else {
+                        pd.dismiss();
+                        givemesometoast(etPassword,"Passwords dont match...");
+
+                    }
+
+                }else{
+                    givemesometoast(etPassword,"Invalid passwords ");
+                }
+
+
+
+            }
+        });
+
+
+    }
+
+    private void givemesometoast(EditText eText,String s) {
+        eText.setError(s);
+        eText.requestFocus();
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    public void loginme(View view) {
+        Pair[] pairs=new Pair[1];
+        pairs[0]=new Pair<View,String>(etEmail,"etTransition");
+
+        ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(RegisterActivity.this,pairs);
+
+        startActivity(new Intent(RegisterActivity.this,MainActivity.class),options.toBundle());
+        finish();
+    }
+}
+
+
+---
+
+Welcome back,
+In this part we will continue with the Registration process.So we will need to create a new activity,lets call it ProfileActivity,This activity will be an empty activity containing input fields for the user name and phone number, you may add other input fields that you prefer. The activity_profile.xml should look like this:
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:id="@+id/parentLayout"
+    android:layout_gravity="center"
+    android:transitionName="etTransition"
+    android:gravity="center"
+    android:background="@color/colorPrimary"
+    android:layout_height="match_parent"
+    tools:context=".ProfileActivity">
+
+    <ImageView
+        android:layout_gravity="center"
+        android:src="@drawable/tags_tu"
+        android:layout_width="wrap_content"
+        android:layout_height="100dp"/>
+    <ImageView
+        android:layout_width="250dp"
+        android:id="@+id/profImage"
+        android:layout_centerInParent="true"
+        android:layout_gravity="center"
+        android:src="@drawable/profile"
+        android:layout_height="250dp"/>
+    <EditText
+        android:inputType="textPersonName"
+        android:hint="User name..."
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+
+        android:layout_marginBottom="10dp"
+        android:id="@+id/etUsername"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <EditText
+        android:inputType="phone"
+        android:hint="Phone...07"
+
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/input_outline"
+        android:padding="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/etPhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <Button
+        android:layout_width="match_parent"
+        android:text="Update Account"
+        android:layout_marginLeft="15dp"
+        android:layout_marginRight="15dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/button_outline"
+        android:padding="10dp"
+        android:textColor="@color/colorWhite"
+        android:id="@+id/btnUpdate"
+        android:layout_height="wrap_content"/>
+
+</LinearLayout>
+It should be equivalent to this:
+This is how the activity_profile.xml will look likeYou will need two images of your choice,one for the logo as can be seen above the layout , and one to represent the profile avartar. The input fields are styled using the stylings we had earlier created input_outline.xml
+The above activity is linked to the Register activity, in this project, i create the user in firebase authentication, then allow this user to create a node in firebase reatime database called : "Users/theuserid", this user id can be gotten from FirebaseAuth instance. The java code below will ensure that this user does not exist already in our database by triggering a check on the onStart() method as shown:
+@Override
+protected void onStart() {
+    super.onStart();
+    mPhotoHubUsers.addValueEventListener(new ValueEventListener() {
+        @Override
+        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+            if (dataSnapshot.hasChild("name"))
+            {
+                String name,phone;
+                 name=dataSnapshot.child("name").getValue().toString();
+                phone=dataSnapshot.child("phone").getValue().toString();
+
+                etPhone.setText(phone);
+                etUsername.setText(name);
+
+
+
+
+
+            }
+        }
+
+        @Override
+        public void onCancelled(@NonNull DatabaseError databaseError) {
+
+        }
+    });
+}
+The above code snippet also assigns the profile_activity input fields some value, just incase you already created your account and you wanted to edit your details.
+The entire activity will then add you to the database just incase you are a new person to the app, by triggering the DatabaseReference and creating a node in FirebaseRealtime Database.
+mPhotoHubUsers= FirebaseDatabase.getInstance().getReference().child("PhotoHub/Users");
+Here is the complete code for the activity.It first does checks for the input fields and displays an error incase the user leaves some blanks:
+package org.likesyou.bensalcie.photohub;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.Continuation;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class ProfileActivity extends AppCompatActivity {
+    private EditText etUsername,etPhone;
+    private Button btnUpdate;
+    private ImageView profImage;
+    private Uri imageUri=null;
+    private DatabaseReference mPhotoHubUsers;
+    private FirebaseAuth mAuth;
+    private String userId="";
+    private ProgressDialog pd;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_profile);
+        getSupportActionBar().hide();
+        etUsername=findViewById(R.id.etUsername);
+        etPhone=findViewById(R.id.etPhone);
+        btnUpdate=findViewById(R.id.btnUpdate);
+        profImage=findViewById(R.id.profImage);
+        pd=new ProgressDialog(this);
+        pd.setTitle("Just a moment");
+        pd.setMessage("Updating profile...");
+        mAuth=FirebaseAuth.getInstance();
+        userId=mAuth.getUid();
+
+
+        mPhotoHubUsers= FirebaseDatabase.getInstance().getReference().child("PhotoHub/Users");
+
+        btnUpdate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String username=etUsername.getText().toString().trim();
+                final String phone=etPhone.getText().toString().trim();
+
+                if (TextUtils.isEmpty(username) || username.length()<4)
+                {
+                    setError(etUsername,"Invalid username");
+                }else {
+                    if (TextUtils.isEmpty(phone) || phone.length()<10)
+                    {
+                        setError(etPhone,"Invalid phone number");
+
+                    }else {
+
+                            pd.show();
+                            if (mAuth.getCurrentUser()==null)
+                            {
+
+                            }else {
+
+
+                                DatabaseReference newUser=mPhotoHubUsers.child(userId);
+                                String email = mAuth.getCurrentUser().getEmail();
+                                newUser.child("name").setValue(username);
+                                newUser.child("email").setValue(email);
+                                newUser.child("phone").setValue(phone).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Void> task) {
+                                        if (task.isSuccessful()) {
+                                            startActivity(new Intent(ProfileActivity.this, HomeActivity.class));
+                                        }
+                                    }
+                                });
+
+
+                            }
+
+                    }
+                }
+
+
+            }
+        });
+
+    }
+
+    private void setError(EditText etPhone, String s) {
+        etPhone.setError(s);
+        etPhone.requestFocus();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        mPhotoHubUsers.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                if (dataSnapshot.hasChild("name"))
+                {
+                    String name,phone;
+                     name=dataSnapshot.child("name").getValue().toString();
+                    phone=dataSnapshot.child("phone").getValue().toString();
+
+                    etPhone.setText(phone);
+                    etUsername.setText(name);
+
+
+
+
+
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+            }
+        });
+    }
+}
+
+
+---
+
+In this next part, we will Create our Home page. This page will play two vital responsibilities, to help us navigate to the upload page and display photos posted earlier by our friends. So create a new activity, a blank activity, call it HomeActivity. Add one FloatingActionButton, also add a RecycerView and a ProgressBar (Horizontal one). Assign some id's to these views and align them accordingly. It should be as shown.(content_home.xml)
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:id="@+id/homeLayout"
+    android:transitionName="etTransition"
+    android:orientation="vertical"
+    android:layout_height="match_parent"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior"
+    tools:context=".HomeActivity"
+    tools:showIn="@layout/activity_home">
+    <ProgressBar
+        android:id="@+id/sendProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_marginRight="40dp"
+        android:layout_marginLeft="40dp"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        android:layout_marginBottom="10dp"
+        android:layout_above="@+id/postImage"
+        android:indeterminate="true"
+        android:layout_height="wrap_content" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:layout_width="match_parent"
+        android:id="@+id/photoList"
+        android:layout_height="match_parent" />
+</LinearLayout>
+Since we want to have some data in our database in order for us to retrieve, we will create the upload the upload activity first. Create a new activity and call it PostActivity, this should be an empty activity. To it, add one input field and an ImageView,ProgressBar and a profile avartar, make sure the image views's viscibility is gone initially. Should look something similar to this:
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:id="@+id/homeLayout"
+    android:orientation="vertical"
+    android:transitionName="etTransition"
+    android:layout_height="match_parent"
+    tools:context=".PostActivity">
+
+    <LinearLayout
+        android:id="@+id/firstHolder"
+        android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:layout_marginTop="20dp"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:layout_width="50dp"
+
+            android:layout_marginLeft="10dp"
+            android:src="@drawable/profile"
+            android:layout_height="50dp"/>
+        <EditText
+            android:layout_width="match_parent"
+            android:lines="7"
+            android:layout_marginBottom="30dp"
+            android:id="@+id/etPost"
+            android:layout_marginRight="20dp"
+            android:layout_marginLeft="20dp"
+            android:hint="What's interesting about your photo?"
+            android:layout_gravity="start"
+            android:gravity="start"
+            android:background="@null"
+            android:layout_height="wrap_content"/>
+
+
+    </LinearLayout>
+    <ProgressBar
+        android:id="@+id/sendProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_marginRight="40dp"
+        android:layout_marginLeft="40dp"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        android:layout_marginBottom="10dp"
+        android:layout_above="@+id/postImage"
+        android:indeterminate="true"
+        android:layout_height="wrap_content" />
+
+    <ImageView
+        android:layout_below="@id/firstHolder"
+        android:id="@+id/postImage"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="25dp"
+        android:layout_marginLeft="25dp"
+        android:layout_width="match_parent"
+        android:layout_height="250dp"/>
+
+
+
+</RelativeLayout>
+We will go to our ProfileActivity.java file, initialize the input fields first, and make sure they are OK. Looking and comparing the biggest payload on our upload page, the image upload is the biggest task that we need, and for this case, it will be the first thing to be excecuted. Therefore we need two menu items in our activity, one to pick an image from the gallery and one to send the data to the database.
+Go to res right click>new>directory: call it menu. inside it, create a new menu resource file, call it post_menu.xml. Its should look as shown below:
+You can add some vector drawables for your menu icons by going to: drawable>new>vectorasset>tap on the android icon, a list of curated icons will be displayed.Now go to your PostActivity.java, overside a method onCreateOptionsMenu(), then call getMenuInfator().inflate(yourmenu,menu)
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.post_menu,menu);
+    return super.onCreateOptionsMenu(menu);
+}
+Add some functionality to the menu items when selected by overiding another method: onOptionsItemSelected(),we will terget our image first, so start a new intent to go to the gallery as shown, make sure to create a constant field GALLERY_REQUEST_CODE=1234, to be an intager not more than 4 characters.
+@Override
+public boolean onOptionsItemSelected(MenuItem item) {
+    if (item.getItemId()==R.id.menu_attachment)
+    {
+        Intent galleryIntent=new Intent(Intent.ACTION_GET_CONTENT);
+        galleryIntent.setType("image/*");
+        startActivityForResult(galleryIntent,GALLERY_REQUEST_CODE);
+   }
+This activity will get the image from gallery and replace the ImageView earlier created on our xml. Make sue to make it viscible when setting the imageuri gotten from the gallery.
+The complete code for the PostActivity.java will look like this:
+package org.likesyou.bensalcie.photohub;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.ActivityOptions;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Pair;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+public class PostActivity extends AppCompatActivity {
+
+    private static final int GALLERY_REQUEST_CODE = 34567;
+    private Uri imageUri=null;
+    private ImageView postImage;
+    private EditText etPost;
+    private ProgressBar pb;
+    private FirebaseAuth mAuth;
+    private RelativeLayout homeLayout;
+    private DatabaseReference mPhotosDatabase;
+    private StorageReference mPhotosStrorage;
+    private String userId;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_post);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        postImage=findViewById(R.id.postImage);
+        etPost=findViewById(R.id.etPost);
+        pb=findViewById(R.id.sendProgress);
+        homeLayout=findViewById(R.id.homeLayout);
+        mAuth=FirebaseAuth.getInstance();
+        userId=mAuth.getUid();
+        mPhotosDatabase=FirebaseDatabase.getInstance().getReference().child("PhotoHub/Blog");
+        mPhotosStrorage=FirebaseStorage.getInstance().getReference().child("PhotoHub/BlogImages");
+
+
+
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.post_menu,menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId()==R.id.menu_attachment)
+        {
+            Intent galleryIntent=new Intent(Intent.ACTION_GET_CONTENT);
+            galleryIntent.setType("image/*");
+            startActivityForResult(galleryIntent,GALLERY_REQUEST_CODE);
+       }else if (item.getItemId()==R.id.menu_send)
+        {
+            final String post=etPost.getText().toString();
+            if (!TextUtils.isEmpty(post) && imageUri!=null) {
+                pb.setVisibility(View.VISIBLE);
+                final StorageReference newPhoto=mPhotosStrorage.child(imageUri.getLastPathSegment());
+                newPhoto.putFile(imageUri).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+
+                        if (task.isSuccessful())
+                        {
+                            final String myKey=mPhotosDatabase.push().getKey();
+
+                            String download_url=task.getResult().getDownloadUrl().toString();
+String datem=getDateTime();
+                            DatabaseReference newDatabase=mPhotosDatabase.child(myKey);
+
+                            newDatabase.child("postid").setValue(myKey);
+                            newDatabase.child("postedby").setValue(userId);
+                            newDatabase.child("postedon").setValue(datem);
+                            newDatabase.child("postdetails").setValue(post);
+                            newDatabase.child("postlikes");
+                            newDatabase.child("postviews");
+                            newDatabase.child("postcomments");
+
+                            newDatabase.child("postimage").setValue(download_url).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+
+                                    if (task.isSuccessful())
+                                    {
+
+
+                                        pb.setVisibility(View.GONE);
+                                        Pair[] pairs=new Pair[1];
+                                        pairs[0]=new Pair<View,String>(homeLayout,"etTransition");
+
+                                        ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(PostActivity.this,pairs);
+
+
+
+                                        startActivity(new Intent(PostActivity.this,HomeActivity.class),options.toBundle());
+
+                                    }
+                                }
+                            });
+
+
+
+
+
+
+
+
+                        }else {
+                            Toast.makeText(PostActivity.this, "Error:"+task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+
+                //here is where to send
+                //Toast.makeText(this, "Ready to send..", Toast.LENGTH_SHORT).show();
+            }else {
+                pb.setVisibility(View.GONE);
+
+                etPost.setError("Type some message for the for your photo...");
+                etPost.requestFocus();
+            }
+            }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode==GALLERY_REQUEST_CODE && resultCode==RESULT_OK)
+        {
+            imageUri=data.getData();
+            postImage.setImageURI(imageUri);
+
+
+        }
+    }
+
+    private String getDateTime() {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        Date date = new Date();
+        return dateFormat.format(date);
+    }
+}
+By the use of FirebaseDatabase and FirebaseStorage, these two will form our database and image storage as well. So we create two references to our notes: "PhotoHub/Blog" and "PhotoHub/BlogImages"
+mPhotosDatabase=FirebaseDatabase.getInstance().getReference().child("PhotoHub/Blog");
+        mPhotosStrorage=FirebaseStorage.getInstance().getReference().child("PhotoHub/BlogImages");
+
+
+We will first start by uploading our image to FirebaseStorage, then later get the image url from the storage , then collectively send the data to FirebaseDatabase.
+newPhoto.putFile(imageUri).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+
+                        if (task.isSuccessful())
+                        {
+                            final String myKey=mPhotosDatabase.push().getKey();
+
+                            String download_url=task.getResult().getDownloadUrl().toString();
+String datem=getDateTime();
+                            DatabaseReference newDatabase=mPhotosDatabase.child(myKey);
+
+                            newDatabase.child("postid").setValue(myKey);
+                            newDatabase.child("postedby").setValue(userId);
+                            newDatabase.child("postedon").setValue(datem);
+                            newDatabase.child("postdetails").setValue(post);
+                            newDatabase.child("postlikes");
+                            newDatabase.child("postviews");
+                            newDatabase.child("postcomments");
+
+                            newDatabase.child("postimage").setValue(download_url).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+
+                                    if (task.isSuccessful())
+                                    {
+
+
+                                        pb.setVisibility(View.GONE);
+                                        Pair[] pairs=new Pair[1];
+                                        pairs[0]=new Pair<View,String>(homeLayout,"etTransition");
+
+                                        ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(PostActivity.this,pairs);
+
+
+
+                                        startActivity(new Intent(PostActivity.this,HomeActivity.class),options.toBundle());
+
+                                    }
+                                }
+                            });
+Make sure to retrieve the push key before sending to the database, then usse that key to child and set the values to the database, also ensure that you save the key as part of the fields in your database, this will be very key in helping you achieve the likes, views and comments features.
+final String myKey=mPhotosDatabase.push().getKey();
+
+                            String download_url=task.getResult().getDownloadUrl().toString();
+String datem=getDateTime();
+                          
+
+                            DatabaseReference newDatabase=mPhotosDatabase.child(myKey);
+I created a method to get me the current time of upload :
+private String getDateTime() {
+    DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+    Date date = new Date();
+    return dateFormat.format(date);
+}
+The complete code for the PostActivity.java should look like this:
+package org.likesyou.bensalcie.photohub;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.ActivityOptions;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Pair;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
+import android.widget.Toast;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+public class PostActivity extends AppCompatActivity {
+
+    private static final int GALLERY_REQUEST_CODE = 34567;
+    private Uri imageUri=null;
+    private ImageView postImage;
+    private EditText etPost;
+    private ProgressBar pb;
+    private FirebaseAuth mAuth;
+    private RelativeLayout homeLayout;
+    private DatabaseReference mPhotosDatabase;
+    private StorageReference mPhotosStrorage;
+    private String userId;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_post);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        postImage=findViewById(R.id.postImage);
+        etPost=findViewById(R.id.etPost);
+        pb=findViewById(R.id.sendProgress);
+        homeLayout=findViewById(R.id.homeLayout);
+        mAuth=FirebaseAuth.getInstance();
+        userId=mAuth.getUid();
+        mPhotosDatabase=FirebaseDatabase.getInstance().getReference().child("PhotoHub/Blog");
+        mPhotosStrorage=FirebaseStorage.getInstance().getReference().child("PhotoHub/BlogImages");
+
+
+
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.post_menu,menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId()==R.id.menu_attachment)
+        {
+            Intent galleryIntent=new Intent(Intent.ACTION_GET_CONTENT);
+            galleryIntent.setType("image/*");
+            startActivityForResult(galleryIntent,GALLERY_REQUEST_CODE);
+       }else if (item.getItemId()==R.id.menu_send)
+        {
+            final String post=etPost.getText().toString();
+            if (!TextUtils.isEmpty(post) && imageUri!=null) {
+                pb.setVisibility(View.VISIBLE);
+                final StorageReference newPhoto=mPhotosStrorage.child(imageUri.getLastPathSegment());
+                newPhoto.putFile(imageUri).addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
+
+                        if (task.isSuccessful())
+                        {
+                            final String myKey=mPhotosDatabase.push().getKey();
+
+                            String download_url=task.getResult().getDownloadUrl().toString();
+String datem=getDateTime();
+                            /*final Map<String,String> newPost=new HashMap<>();
+                            newPost.put("postid",myKey);
+                            newPost.put("postedby",mAuth.getUid());
+                            newPost.put("postedon",getDateTime());
+                            newPost.put("postdetails",post);
+                            newPost.put("postimage",download_url);*/
+
+                            DatabaseReference newDatabase=mPhotosDatabase.child(myKey);
+
+                            newDatabase.child("postid").setValue(myKey);
+                            newDatabase.child("postedby").setValue(userId);
+                            newDatabase.child("postedon").setValue(datem);
+                            newDatabase.child("postdetails").setValue(post);
+                            newDatabase.child("postlikes");
+                            newDatabase.child("postviews");
+                            newDatabase.child("postcomments");
+
+                            newDatabase.child("postimage").setValue(download_url).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+
+                                    if (task.isSuccessful())
+                                    {
+
+
+                                        pb.setVisibility(View.GONE);
+                                        Pair[] pairs=new Pair[1];
+                                        pairs[0]=new Pair<View,String>(homeLayout,"etTransition");
+
+                                        ActivityOptions options=ActivityOptions.makeSceneTransitionAnimation(PostActivity.this,pairs);
+
+
+
+                                        startActivity(new Intent(PostActivity.this,HomeActivity.class),options.toBundle());
+
+                                    }
+                                }
+                            });
+
+
+
+
+
+
+
+
+                        }else {
+                            Toast.makeText(PostActivity.this, "Error:"+task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+
+                //here is where to send
+                //Toast.makeText(this, "Ready to send..", Toast.LENGTH_SHORT).show();
+            }else {
+                pb.setVisibility(View.GONE);
+
+                etPost.setError("Type some message for the for your photo...");
+                etPost.requestFocus();
+            }
+            }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode==GALLERY_REQUEST_CODE && resultCode==RESULT_OK)
+        {
+            imageUri=data.getData();
+            postImage.setImageURI(imageUri);
+
+
+        }
+    }
+
+    private String getDateTime() {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        Date date = new Date();
+        return dateFormat.format(date);
+    }
+}
+Please a cup of coffee…
+After some good work.
+
+---
+
+In this part, we will work on retrieving data to our Home Page, this will entail creating a custom view (a card for this case), a model for our posts and an adapter for our app.
+So create a new Java class by going to your package>new>JavaClass, Please name it as Photos.java , here is where we will create our getters and setters and the constructors for retrieving our posts. It should look like this:
+package org.likesyou.bensalcie.photohub;
+
+public class Photos {
+    private String postid,postedby,postedon,postdetails,postimage;
+
+    public Photos(String postid, String postedby, String postedon, String postdetails, String postimage) {
+        this.postid = postid;
+        this.postedby = postedby;
+        this.postedon = postedon;
+        this.postdetails = postdetails;
+        this.postimage = postimage;
+    }
+
+    public String getPostid() {
+        return postid;
+    }
+
+    public void setPostid(String postid) {
+        this.postid = postid;
+    }
+
+    public String getPostedby() {
+        return postedby;
+    }
+
+    public void setPostedby(String postedby) {
+        this.postedby = postedby;
+    }
+
+    public String getPostedon() {
+        return postedon;
+    }
+
+    public void setPostedon(String postedon) {
+        this.postedon = postedon;
+    }
+
+    public String getPostdetails() {
+        return postdetails;
+    }
+
+    public void setPostdetails(String postdetails) {
+        this.postdetails = postdetails;
+    }
+
+    public String getPostimage() {
+        return postimage;
+    }
+
+    public void setPostimage(String postimage) {
+        this.postimage = postimage;
+    }
+
+    public Photos()
+    {
+
+    }
+
+
+
+
+}
+Make sure you're able to retrieve the user id, of the currently logged in user, by use of FirebaseAuth.
+Start by creating FirebaseRecyclerOptions ,this will take the querry and the class as parameters,these options will be required on our ViewHolder, on your onCreate(), create a method called loadDataToUi(); this is the method we will use to retrieve the data.It should look like this:
+private void loadDataToUi() {
+    pb.setVisibility(View.VISIBLE);
+    FirebaseRecyclerOptions<Photos> options=new FirebaseRecyclerOptions.Builder<Photos>()
+            .setQuery(mPhotosDatabase,Photos.class)
+            .build();
+
+    ///here stuffs
+
+    FirebaseRecyclerAdapter<Photos,PhotosViewHolder> adapter=new FirebaseRecyclerAdapter<Photos, PhotosViewHolder>(options) {
+        @Override
+        protected void onBindViewHolder(@NonNull final PhotosViewHolder holder, int position, @NonNull final Photos model) {
+
+            holder.tvPost.setText(model.getPostdetails());
+            pb.setVisibility(View.GONE);
+            Picasso.get().load(model.getPostimage()).placeholder(R.drawable.photo).into(holder.postImage);
+            //holder.tvViews.setText("  "+model.getPostviews());
+            //holder.tvComments.setText("  "+"0");
+
+            final String postId=model.getPostid();
+            holder.tvLikes.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mPhotosDatabase.child(postId).child("postlikes").child(userId).setValue(1);
+                }
+            });
+            holder.postImage.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mPhotosDatabase.child(postId).child("postviews").child(userId).setValue(1);
+                }
+            });
+            holder.tvComments.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mPhotosDatabase.child(postId).child("postcomments").child(userId).setValue("Loving this");
+                }
+            });
+            mPhotosDatabase.child(postId).child("postlikes").addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+
+                    int likes= (int) dataSnapshot.getChildrenCount();
+                    holder.tvLikes.setText("  "+likes);
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                    Toast.makeText(HomeActivity.this, "Error: "+databaseError, Toast.LENGTH_SHORT).show();
+                }
+            });
+            mPhotosDatabase.child(postId).child("postviews").addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+
+                    int views= (int) dataSnapshot.getChildrenCount();
+                    holder.tvViews.setText("  "+views);
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                    Toast.makeText(HomeActivity.this, "Error: "+databaseError, Toast.LENGTH_SHORT).show();
+                }
+            });
+            mPhotosDatabase.child(postId).child("postcomments").addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+
+                    int coms= (int) dataSnapshot.getChildrenCount();
+                    holder.tvComments.setText("  "+coms);
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+
+                    Toast.makeText(HomeActivity.this, "Error: "+databaseError, Toast.LENGTH_SHORT).show();
+                }
+            });
+
+
+
+
+
+        }
+
+        @NonNull
+        @Override
+        public PhotosViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
+
+            View view=LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.single_photo,viewGroup,false);
+            PhotosViewHolder viewHolder=new PhotosViewHolder(view);
+            return viewHolder;
+        }
+    };
+
+    photoList.setAdapter(adapter);
+    adapter.startListening();
+
+
+    //here again
+
+
+}
+Realize that within these two methods, we have the functionalities for like, views and comment: First i achieve this by retrieving the likes,views and comments counts by converting them into an intager with the example of likes below:
+mPhotosDatabase.child(postId).child("postlikes").addValueEventListener(new ValueEventListener() {
+    @Override
+    public void onDataChange(DataSnapshot dataSnapshot) {
+
+        int likes= (int) dataSnapshot.getChildrenCount();
+        holder.tvLikes.setText("  "+likes);
+    }
+
+    @Override
+    public void onCancelled(DatabaseError databaseError) {
+
+        Toast.makeText(HomeActivity.this, "Error: "+databaseError, Toast.LENGTH_SHORT).show();
+    }
+});
+Once you like, with the use of the viewholder, i access the tvLikes view, then assign an onclick listener to it, this listener then creates an object of the user id in the specific post, using the ide we had earlier saved in the database as part of the fields. This add a like to the existing database by setting a value of one besides the user id: Check below
+holder.tvLikes.setOnClickListener(new View.OnClickListener() {
+    @Override
+    public void onClick(View v) {
+        mPhotosDatabase.child(postId).child("postlikes").child(userId).setValue(1);
+    }
+});
+In the HomeActivity.java file we also have a menu to access the user profile activity incase of any update and the logout button. This can be found in the menus folder, amenu called menu main:
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:title="Profile"  android:id="@+id/menu_profile"/>
+    <item android:title="Logout"  android:id="@+id/menu_logout"/>
+
+</menu>
+We also need to create a custom view for our single photo item, this will determine how all our posts will look like, this is the code: (single_photo.xml)
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    app:cardBackgroundColor="@color/colorWhite"
+    app:cardCornerRadius="16dp"
+    android:layout_margin="4dp"
+    app:cardElevation="4dp"
+    app:cardUseCompatPadding="true"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:orientation="vertical"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:layout_width="match_parent"
+            android:id="@+id/ivPostmage"
+            android:scaleType="centerCrop"
+            android:src="@drawable/photo"
+            android:layout_height="220dp"/>
+        <TextView
+            android:layout_width="match_parent"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginRight="15dp"
+            android:layout_marginLeft="15dp"
+            android:id="@+id/tvDescription"
+            android:text="Some description..."
+            android:layout_height="wrap_content"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="5dp"
+            android:layout_marginRight="10dp"
+            android:layout_marginLeft="10dp"
+            android:layout_height="wrap_content">
+            <TextView
+                android:layout_width="match_parent"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/colorBlack"
+                android:layout_gravity="center"
+                android:drawableLeft="@drawable/ic_favorite_black_24dp"
+                android:layout_weight="1"
+                android:id="@+id/tvLikes"
+                android:layout_margin="5dp"
+                android:text="  Likes"
+                android:layout_height="wrap_content"/>
+            <TextView
+                android:layout_width="match_parent"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_weight="1"
+                android:textColor="@color/colorBlack"
+                android:layout_gravity="center"
+                android:drawableLeft="@drawable/ic_remove_red_eye_black_24dp"
+android:layout_margin="5dp"
+                android:id="@+id/tvViews"
+                android:text="   Views"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:textSize="18sp"
+                android:drawableLeft="@drawable/ic_mode_comment_black_24dp"
+                android:textStyle="bold"
+                android:textColor="@color/colorBlack"
+android:layout_gravity="center|right"
+android:layout_margin="5dp"
+                android:layout_weight="1"
+              android:id="@+id/tvComments"
+                android:text="  Coms"
+                android:layout_height="wrap_content"/>
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
+Single post item(single_post.xml)You can use an image of your choice, and a design of your choice as well. The views, likes and comments are TextViews with drawables on the left. My drawables are vectors as well, you can opt for something else. Make sure to assign the same id's as in the code, it will be used by our adapter in assigning the ViewHolder the view elements.
+
+
+---
+
+I left the comments section to contain some dummy content when you press the icon to comment, this is your assignment, add a dialog or a fragment or an activity, to get some comment from user, the parse that message to the same post as a new comment. To claim a view on this app, just tap on the image. This is also an assignment, you can add a hover or zoom effect on the image, and make the view become more viscible.
+Lastly we will add an icon for our app by going to app>new>ImageAsset> select your prefered image. Hoping that you went all well along this tutorial, when you run your app, you should be able to see this:
+
+
+User journey when uploading some photo and some caption.
+Thank you for your time, stay tuned for more exiting tutorials on Arduino,esp8266 and IOT using android.Drop down you comments i value your feedback on how best to deliver such tutorials.
+Links to source code and resources:
+Twitter: https://twitter.com/ibensalcie
+Source code: https://drive.google.com/open?id=1Xxx3YPdVZLVu_biy-YNCe7cr8vQ1itxH
+Resources: https://drive.google.com/open?id=1FE0JxBk2scDBRgC3B7yetEVylPuiYu-3
